@@ -12,72 +12,76 @@ import (
 
 // A link performance package that collects data on HTTP performance on a list of links.
 
-//"fmt"
-//"net/http"
-//"net/http/httptrace"
-
-//"time"
-// "golang.org/x/exp/maps"
-
-type Perf struct {
+type Profile struct {
 	GotFirstResponseByte int // Time from request to first byte received in ms
 
 }
-type LinkPerf struct {
+type LinkProfiler struct {
 	mu    *sync.Mutex
-	perf  map[string][]Perf
+	perf  map[string][]Profile
 	tries int
 }
 
 // Initialize a new LinkProfiler.
-func NewLinkPerf(links []string, tries int) LinkPerf {
-	lp := LinkPerf{mu: &sync.Mutex{}, tries: tries, perf: make(map[string][]Perf)}
+func NewLinkProfiler(links []string, tries int) LinkProfiler {
+	lp := LinkProfiler{mu: &sync.Mutex{}, tries: tries, perf: make(map[string][]Profile)}
 	// Transform simple slice of links to internal map of link to
 	// slice of Perf structs. The length of the slice should be initialized
 	// to the amountof tries.
 	for _, l := range links {
-		perfs := make([]Perf, tries)
+		perfs := make([]Profile, tries)
 		lp.perf[l] = perfs
 	}
 	return lp
 }
+// "Private" method to profile one link. Internally sets the map of links
+// to slices of profile structs.
+func (lp *LinkProfiler) profileLink(l string, try int, ch chan string) {
+	req, err := http.NewRequest("GET", l, nil)
 
-// Runs a performance profile on time to first byte received for
-// links.
-func (lp *LinkPerf) Run() map[string][]Perf {
-	ch := make(chan string)
-	for i, l := range maps.Keys(lp.perf) {
-		for j := 0; j <= lp.tries - 1; j++ {
-			go func(l string, i int) {
-				req, err := http.NewRequest("GET", l, nil)
-				if err != nil {
-					lp.perf[l][i] = Perf{GotFirstResponseByte: -1}
-					ch <- err.Error()
-					return
-				}
-				var start time.Time
-				trace := &httptrace.ClientTrace{
-					GotFirstResponseByte: func() {
-						since := time.Since(start)
-						fmt.Printf("Got %s in %v\n", l, since)
-						lp.mu.Lock()
-						defer lp.mu.Unlock()
-						lp.perf[l][i] = Perf{GotFirstResponseByte: int(time.Since(start) / time.Millisecond)}
-					},
-				}
-				req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
-				start = time.Now()
-				if _, err := http.DefaultTransport.RoundTrip(req); err != nil {
-					lp.perf[l][i] = Perf{GotFirstResponseByte: -1}
-					ch <- err.Error()
-					return
-				}
-				ch <- l
-			}(l, i)
+	if err != nil {
+		lp.perf[l][try] = Profile{GotFirstResponseByte: -1}
+		ch <- err.Error()
+		return
+	}
+
+	var start time.Time
+	trace := &httptrace.ClientTrace{
+		GotFirstResponseByte: func() {
+			since := time.Since(start)
+			fmt.Printf("Got %s in %v\n", l, since)
+			lp.mu.Lock()
+			defer lp.mu.Unlock()
+			lp.perf[l][try] = Profile{GotFirstResponseByte: int(time.Since(start) / time.Millisecond)}
+		},
+	}
+
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+
+	start = time.Now()
+
+	if _, err := http.DefaultTransport.RoundTrip(req); err != nil {
+		lp.perf[l][try] = Profile{GotFirstResponseByte: -1}
+		ch <- err.Error()
+		return
+	}
+	ch <- l
+}
+
+// Get a slice of Profile structs for the given link.
+func (lp *LinkProfiler) Get(link string) []Profile {
+	return lp.perf[link]
+}
+
+// Runs a performance profiler on
+func (lp *LinkProfiler) Run() {
+	for _, l := range maps.Keys(lp.perf) {
+		ch := make(chan string)
+		for try := 0; try < lp.tries; try++ {
+			go lp.profileLink(l, try, ch)
+		}
+		for range maps.Keys(lp.perf) {
+			<-ch
 		}
 	}
-	for range maps.Keys(lp.perf) {
-		<-ch
-	}
-	return lp.perf
 }
