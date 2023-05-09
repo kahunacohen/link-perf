@@ -13,8 +13,8 @@ import (
 // A link performance package that collects data on HTTP performance on a list of links.
 
 type Profile struct {
-	DNSStart             uint64 // Time to DNS start in
-	GotFirstResponseByte uint64 // Time from request to first byte received in ms
+	DNSStart             int64 // Time to DNS start in
+	GotFirstResponseByte int64 // Time from request to first byte received in microseconds
 
 }
 type LinkProfiler struct {
@@ -23,11 +23,10 @@ type LinkProfiler struct {
 	tries int
 }
 
-// Initialize a new LinkProfiler.
 func NewLinkProfiler(links []string, tries int) LinkProfiler {
 	lp := LinkProfiler{mu: &sync.Mutex{}, tries: tries, perf: make(map[string][]Profile)}
 	// Transform simple slice of links to internal map of link to
-	// slice of Perf structs. The length of the slice should be initialized
+	// slice of Profile structs. The length of the slice should be initialized
 	// to the amountof tries.
 	for _, l := range links {
 		perfs := make([]Profile, tries)
@@ -50,29 +49,18 @@ func (lp *LinkProfiler) profileLink(l string, try int, ch chan string) {
 	var start time.Time
 	trace := &httptrace.ClientTrace{
 		GotFirstResponseByte: func() {
-			// since := time.Since(start)
-			// fmt.Printf("GotFirstResponseByte for %s in %v\n", l, since)
+			since := time.Since(start)
+			fmt.Printf("Time to GotFirstResponseByte for %s in %v\n", l, since)
 			lp.mu.Lock()
 			defer lp.mu.Unlock()
-			lp.perf[l][try].GotFirstResponseByte = int(time.Since(start) / time.Millisecond)
-			fmt.Printf("link: %s\n", l)
-			fmt.Printf("try: %d\n", try)
-
-			fmt.Printf("in GotFirstResponseByte: %+v\n", lp.perf[l][try])
-
+			lp.perf[l][try].GotFirstResponseByte = int64(since)
 		},
 		DNSStart: func(di httptrace.DNSStartInfo) {
-			// since := time.Since(start)
-			// fmt.Printf("DNSStart for %s in %v\n", l, since)
+			since := time.Since(start)
+			fmt.Printf("Time to DNSStart for %s in %v\n", l, since)
 			lp.mu.Lock()
 			defer lp.mu.Unlock()
-			fmt.Println(int(time.Since(start) / time.Millisecond))
-			// lp.perf[l][try].DNSStart = int(time.Since(start) / time.Millisecond)
-			lp.perf[l][try].DNSStart = int(time.Since(start))
-
-			fmt.Printf("link: %s\n", l)
-			fmt.Printf("try: %d\n", try)
-			fmt.Printf("in DNSStart: %+v\n", lp.perf[l][try])
+			lp.perf[l][try].DNSStart = int64(since)
 		},
 	}
 
