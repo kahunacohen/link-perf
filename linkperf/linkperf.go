@@ -13,8 +13,8 @@ import (
 // A link performance package that collects data on HTTP performance on a list of links.
 
 type Profile struct {
-	DNSStart             int // Time to DNS start in
-	GotFirstResponseByte int // Time from request to first byte received in ms
+	DNSStart             uint64 // Time to DNS start in
+	GotFirstResponseByte uint64 // Time from request to first byte received in ms
 
 }
 type LinkProfiler struct {
