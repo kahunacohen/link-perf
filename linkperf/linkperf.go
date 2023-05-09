@@ -13,7 +13,7 @@ import (
 // A link performance package that collects data on HTTP performance on a list of links.
 
 type Profile struct {
-	DNSStart int // Time to DNS start in ms
+	DNSStart             int // Time to DNS start in
 	GotFirstResponseByte int // Time from request to first byte received in ms
 
 }
@@ -35,6 +35,7 @@ func NewLinkProfiler(links []string, tries int) LinkProfiler {
 	}
 	return lp
 }
+
 // "Private" method to profile one link. Internally sets the map of links
 // to slices of profile structs.
 func (lp *LinkProfiler) profileLink(l string, try int, ch chan string) {
@@ -49,19 +50,30 @@ func (lp *LinkProfiler) profileLink(l string, try int, ch chan string) {
 	var start time.Time
 	trace := &httptrace.ClientTrace{
 		GotFirstResponseByte: func() {
-			since := time.Since(start)
-			fmt.Printf("GotFirstResponseByte for %s in %v\n", l, since)
+			// since := time.Since(start)
+			// fmt.Printf("GotFirstResponseByte for %s in %v\n", l, since)
 			lp.mu.Lock()
 			defer lp.mu.Unlock()
-			lp.perf[l][try] = Profile{GotFirstResponseByte: int(time.Since(start) / time.Millisecond)}
+			lp.perf[l][try].GotFirstResponseByte = int(time.Since(start) / time.Millisecond)
+			fmt.Printf("link: %s\n", l)
+			fmt.Printf("try: %d\n", try)
+
+			fmt.Printf("in GotFirstResponseByte: %+v\n", lp.perf[l][try])
+
 		},
-		// DNSStart: func(di httptrace.DNSStartInfo) {
-		// 	since := time.Since(start)
-		// 	fmt.Printf("DNSStart for %s in %v\n", l, since)
-		// 	lp.mu.Lock()
-		// 	defer lp.mu.Unlock()
-		// 	lp.perf[l][try] = Profile{DNSStart: int(time.Since(start) / time.Millisecond)}
-		// },
+		DNSStart: func(di httptrace.DNSStartInfo) {
+			// since := time.Since(start)
+			// fmt.Printf("DNSStart for %s in %v\n", l, since)
+			lp.mu.Lock()
+			defer lp.mu.Unlock()
+			fmt.Println(int(time.Since(start) / time.Millisecond))
+			// lp.perf[l][try].DNSStart = int(time.Since(start) / time.Millisecond)
+			lp.perf[l][try].DNSStart = int(time.Since(start))
+
+			fmt.Printf("link: %s\n", l)
+			fmt.Printf("try: %d\n", try)
+			fmt.Printf("in DNSStart: %+v\n", lp.perf[l][try])
+		},
 	}
 
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
