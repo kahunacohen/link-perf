@@ -1,5 +1,5 @@
 # link-perf
-The beginnings of a link performance profiler. This is an experiment in concurrent HTTP Requests in GO.
+The beginnings of a link performance profiler. This is an experiment in concurrent HTTP Requests in go.
 
 The struct `LinkProfiler` takes a slice of links and number of tries for each link. When executing
 `Run` on the struct instance, the profiler makes concurrent requests for each link and measures various metrics
