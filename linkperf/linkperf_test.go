@@ -17,7 +17,7 @@ func TestNewLinkPerf(t *testing.T) {
 }
 func TestRun(t *testing.T) {
 	// Run link profiler on two links. Try each link twice.
-	linkProfiler := NewLinkProfiler([]string{"https://www.google.com", "https://www.yahoo.com"}, 3)
+	linkProfiler := NewLinkProfiler([]string{"https://www.google.com", "https://www.yahoo.com", "https://www.microsoft.com"}, 3)
 	linkProfiler.Run()
 	googleProfiles := linkProfiler.Get("https://www.google.com")
 	if len(googleProfiles) != 3 {
